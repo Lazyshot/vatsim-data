@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/lazyshot/vatsim-data/pkg/client"
+	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -13,6 +15,15 @@ var pollCmd = &cobra.Command{
 	Use: "poll",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.New()
+		nc, err := nats.Connect(viper.GetString("nats-url"))
+		if err != nil {
+			zap.S().Fatalw("fail to connect to nats", "err", err)
+		}
+
+		js, err := nc.JetStream()
+		if err != nil {
+			zap.S().Fatalw("fail to connect to jetstream", "err", err)
+		}
 
 		for range time.NewTicker(viper.GetDuration("interval")).C {
 			data, err := c.PullData()
@@ -23,9 +34,29 @@ var pollCmd = &cobra.Command{
 				continue
 			}
 
-			zap.S().Debugw("data returned",
-				"data", data,
-			)
+			for _, p := range data.Pilots {
+				b, err := json.Marshal(p)
+				if err != nil {
+					zap.S().Errorw("failed to marshal pilot data",
+						"err", err,
+					)
+					continue
+				}
+
+				js.Publish("pilots", b)
+			}
+
+			for _, c := range data.Controllers {
+				b, err := json.Marshal(c)
+				if err != nil {
+					zap.S().Errorw("failed to marshal pilot data",
+						"err", err,
+					)
+					continue
+				}
+
+				js.Publish("controllers", b)
+			}
 		}
 	},
 }

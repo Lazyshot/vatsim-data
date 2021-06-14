@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nats-io/nats.go"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -37,6 +39,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().String("nats-url", nats.DefaultURL, "url to nats server")
 	cobra.OnInitialize(initConfig)
 }
 
